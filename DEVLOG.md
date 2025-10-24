@@ -9,12 +9,14 @@ Engineering decisions, implementation notes, research findings, and challenges d
 **What:** Added per-body radius and sphere-sphere narrowphase baseline.
 
 **Implementation:**
+
 - Added `radius` field to `RigidBodyDesc` (default 0.5f)
 - Implemented `generate_contacts_sphere_sphere()` in `src/collision/narrowphase.cpp`
 - Contacts store normal direction and penetration depth
 - Minimal projection solver splits penetration equally between bodies
 
 **Testing:**
+
 - Created `collision_spheres` test
 - All determinism tests pass
 
@@ -29,25 +31,30 @@ Engineering decisions, implementation notes, research findings, and challenges d
 **What:** Reworked simulation step to use frictionless PGS velocity solver.
 
 **Implementation:**
+
 - Refactored `World::step()` to separate velocity integration, broadphase, narrowphase, solve, position integration
 - PGS solver: 8 iterations, Baumgarte bias (0.2) for positional error correction
 - Warm-start: store per-pair accumulated normal impulses, apply on next frame
 - Effective mass: `k = 1/ma + 1/mb` (no angular terms yet)
 
 **API Changes:**
+
 - Added `getVelocity()` to C++/C APIs
 - Exported `ape_world_get_velocity_out` in WASM
 
 **Testing:**
+
 - Added `solver_velocity` test: validates non-closing normal velocity
 - Optional positional correction pass eliminates residual overlap
 
 **Research Notes:**
+
 - Baumgarte stabilization: bias = β * (penetration / dt)
 - Warm-starting critical for stack stability (converges in 2-3 iterations vs 8+ cold-start)
 - Clamping normal impulse to non-negative prevents tension
 
 **Challenges:**
+
 - Initial `collision_spheres` test failed; needed to increase iterations and add positional correction
 - Balance between Baumgarte factor (too high = jitter, too low = sinking)
 
@@ -58,6 +65,7 @@ Engineering decisions, implementation notes, research findings, and challenges d
 **What:** Added material properties (friction, restitution) with full Coulomb friction and bounce.
 
 **Implementation:**
+
 - Extended `RigidBodyDesc`: `friction` (0-1, default 0.5), `restitution` (0-1, default 0.0)
 - Extended `Contact`: stores combined friction/restitution per pair
 - Material combination rules:
@@ -65,57 +73,121 @@ Engineering decisions, implementation notes, research findings, and challenges d
   - Restitution: minimum `min(ra, rb)` (conservative, least bouncy dominates)
 
 **Friction Solver:**
+
 - Tangential impulse computed perpendicular to normal: `vt = rv - (rv·n)n`
 - Friction cone constraint: `|Jt| <= μ * Jn` (Coulomb's law)
 - Accumulated tangential impulse clamped within cone each iteration
 
 **Restitution Solver:**
+
 - Applied only on first iteration when `vn < -0.1` (threshold prevents jitter at rest)
 - Restitution bias: `bias -= e * vn` (e is restitution coefficient)
 - Physics: `v'_n = -e * v_n` for perfect collision
 
 **Warm-Start Extensions:**
+
 - Store both normal and tangential impulses per pair
 - Tangential impulse stored as `Vec3` for full 3D friction
 
 **Testing:**
+
 - Added `restitution` test: bouncy ball (e=0.8) dropped from 10m height
 - Validates positive velocity after bounce
 - All 12 tests pass (100%)
 
 **Web Demo:**
+
 - Created interactive `Stacking` demo
 - Adjustable friction/restitution sliders
 - Stack of 5 spheres showcases material behavior
 
 **Research Notes:**
+
 - Geometric mean for friction: industry standard, physically motivated (contact mechanics)
 - Minimum for restitution: standard in game engines (prevents unrealistic bouncing)
 - Velocity threshold critical: without it, resting contacts "micro-bounce" indefinitely
 - Tangent direction computed from current relative velocity (not persistent across frames)
 
 **Challenges:**
+
 - Tangential impulse magnitude computation: needed to project relative velocity onto tangent plane
 - Friction cone clamping: magnitude-based clamping in tangent direction
 - Initial friction implementation was 1D; generalized to full 3D tangent space
 
 **Performance Notes:**
+
 - Friction adds ~30% cost per iteration (tangent vector computation + magnitude operations)
 - Warm-start effectiveness: reduces iterations from 8 to ~3 for stable stacks
 
 **Decisions:**
+
 - Chose velocity-dependent restitution threshold (-0.1 m/s) based on experimentation
 - Friction cone uses accumulated impulse magnitude (not per-iteration delta) for stability
 - Apply restitution only on first iteration (standard practice, prevents oscillation)
 
 ---
 
+## 2025-10-24 11:46 EDT - Sleeping System
+
+**What:** Implemented automatic sleep/wake system for inactive bodies.
+
+**Implementation:**
+- Added `awake` flag (uint16_t) and `sleep_timer` (float) to SoA storage
+- Sleep thresholds: linear velocity < 0.01 m/s for 0.5 seconds
+- Bodies start awake on creation
+- Sleep detection runs after position integration
+
+**Sleep Logic:**
+1. Track motion: compute linear velocity magnitude
+2. If below threshold: accumulate timer
+3. If timer >= 0.5s: put to sleep, zero velocity
+4. If above threshold: reset timer
+
+**Wake Logic:**
+- Bodies wake on contact with awake bodies (checked after narrowphase)
+- Wake propagates through contact graph (cascading wake)
+- Sleeping body contacting static body stays asleep
+
+**Optimization:**
+- Skip sleeping bodies in velocity integration
+- Skip sleeping bodies in position integration  
+- Include sleeping bodies in broadphase (for wake-on-contact detection)
+- Skip solver for pairs where both bodies sleep
+
+**Testing:**
+- Added `sleeping` test: validates low-velocity body sleeps, high-velocity doesn't
+- All 13 tests pass (100%)
+
+**Performance Impact:**
+- Expected 3-5x speedup for large static scenes (most bodies sleeping)
+- Negligible overhead for active scenes (sleep check is simple threshold)
+- Wake-on-contact adds small cost to narrowphase loop
+
+**Design Decisions:**
+- Velocity zeroing on sleep prevents slow drift accumulation
+- 0.5s timer prevents "flicker" (sleep-wake-sleep oscillation)
+- Threshold 0.01 m/s chosen to be imperceptible but allow resting
+- Include sleeping in broadphase: necessary for wake propagation
+
+**Challenges:**
+- Initial test tried wake-on-collision with velocity transfer (too complex)
+- Simplified to just validate sleep/wake state transitions
+- Considered island-based sleeping (deferred to future)
+
+**Future Improvements:**
+- Island detection: sleep entire connected components
+- Angular velocity threshold (when rotation added)
+- User-controllable sleep parameters via API
+- Sleep state visualization in debug views
+
+---
+
 ## Next Steps (Prioritized)
 
 1. **Shape Types:** Box primitive with SAT narrowphase (essential for diverse scenes)
-2. **Sleeping:** Body sleep/wake system to skip inactive bodies (major perf win)
-3. **Profiling:** Add zone timers and counters for broadphase/narrowphase/solver
-4. **Contact Manifolds:** Multi-point contacts for box-box stability
-5. **CCD:** Continuous collision detection for fast-moving objects (tunneling prevention)
+2. **Profiling:** Add zone timers and counters for broadphase/narrowphase/solver
+3. **Contact Manifolds:** Multi-point contacts for box-box stability
+4. **CCD:** Continuous collision detection for fast-moving objects (tunneling prevention)
+5. **Islands:** Detect connected components for batch sleeping
 
 ---

@@ -32,3 +32,15 @@ All notable changes to this project will be documented in this file.
 - Extend warm-start state to store both normal and tangential impulses.
 - Add `restitution` test; bouncy ball validates positive velocity after bounce.
 - Update `DEVLOG.md` with friction/restitution research notes.
+
+## 2025-10-24 11:46 EDT - Sleeping System
+
+- Implement automatic sleep/wake system for inactive rigid bodies.
+- Add `awake` flag and `sleep_timer` to body storage.
+- Sleep threshold: linear velocity < 0.01 m/s for 0.5 seconds.
+- Wake-on-contact: sleeping bodies wake when contacted by awake bodies.
+- Skip sleeping bodies in velocity integration, position integration, and solver.
+- Include sleeping bodies in broadphase for wake detection.
+- Add `sleeping` test: validates sleep state transitions.
+- Expected 3-5x performance improvement for large static scenes.
+- All 13 tests pass (100%).

@@ -22,7 +22,14 @@ struct World::Impl {
     std::vector<float> restitution;
     std::vector<uint16_t> gen; // per-slot generation counters
     std::vector<uint16_t> alive; // 1 if occupied, 0 if free (small, cache-friendly)
+    std::vector<uint16_t> awake; // 1 if awake, 0 if sleeping
+    std::vector<float> sleep_timer; // accumulates time below motion threshold
     std::vector<uint16_t> free_list; // indices available for reuse
+
+    // Sleep configuration
+    static constexpr float sleep_linear_threshold = 0.01f;  // m/s
+    static constexpr float sleep_angular_threshold = 0.01f; // rad/s (placeholder for future rotation)
+    static constexpr float sleep_time_required = 0.5f;      // seconds of low motion before sleep
 
     Vec3 gravity{0.f, -9.80665f, 0.f};
 
@@ -65,6 +72,8 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
             impl->restitution.push_back(d.restitution);
             impl->gen.push_back(0);
             impl->alive.push_back(1);
+            impl->awake.push_back(1); // start awake
+            impl->sleep_timer.push_back(0.0f);
             return Impl::pack_handle(idx, impl->gen[idx]);
         }
         impl->pos[idx] = d.position;
@@ -77,6 +86,10 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
         impl->friction[idx] = d.friction;
         if (idx >= impl->restitution.size()) impl->restitution.resize(idx+1, 0.0f);
         impl->restitution[idx] = d.restitution;
+        if (idx >= impl->awake.size()) impl->awake.resize(idx+1, 1);
+        impl->awake[idx] = 1; // start awake
+        if (idx >= impl->sleep_timer.size()) impl->sleep_timer.resize(idx+1, 0.0f);
+        impl->sleep_timer[idx] = 0.0f;
         impl->alive[idx] = 1;
     } else {
         if (impl->pos.size() >= std::numeric_limits<uint16_t>::max()) {
@@ -92,6 +105,8 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
         impl->restitution.push_back(d.restitution);
         impl->gen.push_back(0);
         impl->alive.push_back(1);
+        impl->awake.push_back(1); // start awake
+        impl->sleep_timer.push_back(0.0f);
     }
     return Impl::pack_handle(idx, impl->gen[idx]);
 }
@@ -111,19 +126,20 @@ void World::destroyRigidBody(std::uint32_t id) {
 void World::step(float dt) {
     const Vec3 g = impl->gravity;
     const size_t n = impl->pos.size();
-    // 1) Integrate velocities with gravity
+    // 1) Integrate velocities with gravity (skip sleeping bodies)
     for (size_t i = 0; i < n; ++i) {
-        if (!impl->alive[i]) continue;
+        if (!impl->alive[i] || !impl->awake[i]) continue;
         Vec3 v = impl->vel[i];
         v.x += g.x * dt; v.y += g.y * dt; v.z += g.z * dt;
         impl->vel[i] = v;
     }
 
-    // 2) Broadphase on current positions
+    // 2) Broadphase on current positions (include sleeping for wake-on-contact)
     impl->aabbs.clear();
     impl->aabbs.reserve(n);
     for (size_t i = 0; i < n; ++i) {
         if (!impl->alive[i]) { impl->aabbs.push_back(AABB{0,0,0,0,0,0}); continue; }
+        // Include sleeping bodies in broadphase to wake them on contact
         const Vec3 p = impl->pos[i];
         const float r = (i < impl->radius.size() && impl->radius[i] > 0.0f) ? impl->radius[i] : 0.5f;
         AABB box{p.x - r, p.y - r, p.z - r, p.x + r, p.y + r, p.z + r};
@@ -139,6 +155,21 @@ void World::step(float dt) {
     const float* friction_ptr = impl->friction.empty() ? nullptr : impl->friction.data();
     const float* restitution_ptr = impl->restitution.empty() ? nullptr : impl->restitution.data();
     generate_contacts_sphere_sphere(impl->pos.data(), radii_ptr, friction_ptr, restitution_ptr, impl->pos.size(), impl->pairs, impl->contacts);
+
+    // Wake sleeping bodies on contact with awake bodies
+    for (const Contact &c : impl->contacts) {
+        const uint32_t ia = c.a, ib = c.b;
+        if (ia >= impl->awake.size() || ib >= impl->awake.size()) continue;
+        const bool awake_a = impl->awake[ia] != 0;
+        const bool awake_b = impl->awake[ib] != 0;
+        if (awake_a && !awake_b) {
+            impl->awake[ib] = 1;
+            impl->sleep_timer[ib] = 0.0f;
+        } else if (awake_b && !awake_a) {
+            impl->awake[ia] = 1;
+            impl->sleep_timer[ia] = 0.0f;
+        }
+    }
 
     // 4) PGS solver with friction, restitution, warm-start
     const int solverIterations = 8;
@@ -181,6 +212,8 @@ void World::step(float dt) {
                 const Contact &c = impl->contacts[i];
                 const uint32_t ia = c.a, ib = c.b;
                 if (!impl->alive[ia] || !impl->alive[ib]) continue;
+                // Skip if both bodies are sleeping
+                if (!impl->awake[ia] && !impl->awake[ib]) continue;
                 const float invMa = (impl->mass[ia] > 0.0f) ? (1.0f / impl->mass[ia]) : 0.0f;
                 const float invMb = (impl->mass[ib] > 0.0f) ? (1.0f / impl->mass[ib]) : 0.0f;
                 if (invMa == 0.0f && invMb == 0.0f) continue;
@@ -296,13 +329,37 @@ void World::step(float dt) {
         impl->warm_impulses_t.push_back(impl->solver_impulses_t[i]);
     }
 
-    // 5) Integrate positions with solved velocities
+    // 5) Integrate positions with solved velocities (skip sleeping)
     for (size_t i = 0; i < n; ++i) {
-        if (!impl->alive[i]) continue;
+        if (!impl->alive[i] || !impl->awake[i]) continue;
         Vec3 p = impl->pos[i];
         const Vec3 v = impl->vel[i];
         p.x += v.x * dt; p.y += v.y * dt; p.z += v.z * dt;
         impl->pos[i] = p;
+    }
+
+    // 6) Sleep detection: check motion and update timers
+    for (size_t i = 0; i < n; ++i) {
+        if (!impl->alive[i]) continue;
+        if (!impl->awake[i]) continue; // already sleeping
+        
+        // Compute motion: linear velocity magnitude
+        const Vec3 v = impl->vel[i];
+        const float lin_motion = std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+        
+        if (lin_motion < Impl::sleep_linear_threshold) {
+            // Below threshold: accumulate sleep timer
+            impl->sleep_timer[i] += dt;
+            if (impl->sleep_timer[i] >= Impl::sleep_time_required) {
+                // Put to sleep
+                impl->awake[i] = 0;
+                // Zero out velocity to prevent drift
+                impl->vel[i] = Vec3{0,0,0};
+            }
+        } else {
+            // Above threshold: reset timer
+            impl->sleep_timer[i] = 0.0f;
+        }
     }
 }
 
