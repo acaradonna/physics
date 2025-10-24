@@ -56,11 +56,24 @@ ape_vec3 ape_world_get_position(const ape_world* h, uint32_t id) {
     return ape_vec3{p.x, p.y, p.z};
 }
 
+ape_vec3 ape_world_get_velocity(const ape_world* h, uint32_t id) {
+    if (!h || !h->w) return ape_vec3{0,0,0};
+    auto v = h->w->getVelocity(id);
+    return ape_vec3{v.x, v.y, v.z};
+}
+
 void ape_world_get_position_out(const ape_world* h, uint32_t id, ape_vec3* out) {
     if (!out) return;
     if (!h || !h->w) { out->x = out->y = out->z = 0.0f; return; }
     auto p = h->w->getPosition(id);
     out->x = p.x; out->y = p.y; out->z = p.z;
+}
+
+void ape_world_get_velocity_out(const ape_world* h, uint32_t id, ape_vec3* out) {
+    if (!out) return;
+    if (!h || !h->w) { out->x = out->y = out->z = 0.0f; return; }
+    auto v = h->w->getVelocity(id);
+    out->x = v.x; out->y = v.y; out->z = v.z;
 }
 
 void ape_world_set_gravity(ape_world* h, ape_vec3 g) {

@@ -15,3 +15,10 @@ All notable changes to this project will be documented in this file.
 - Update build to include `src/collision/narrowphase.cpp`.
 - Docs: mark narrowphase baseline done in `docs/ROADMAP.md`; update `ARCHITECTURE.md`, `PERFORMANCE-NOTES.md`.
 - Web: add `Sphere Collision` demo to `web/index.html` with `web/js/demos/collision_spheres.js`.
+
+## 2025-10-24 (later)
+
+- Introduce frictionless PGS velocity solver with Baumgarte bias and warm-starting.
+- Expose `getVelocity` in C++/C APIs; export in WASM and JS engine.
+- Add `solver_velocity` test; wire into CMake.
+- Update `docs/ROADMAP.md` marking PGS baseline complete.

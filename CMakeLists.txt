@@ -188,6 +188,18 @@ if(APE_BUILD_TESTS)
             target_compile_options(ape_collision_spheres PRIVATE -Wall -Wextra -Wpedantic)
         endif()
     endif()
+
+    add_executable(ape_solver_velocity test/solver_velocity.cpp)
+    target_link_libraries(ape_solver_velocity PRIVATE ape_core)
+    add_test(NAME solver_velocity COMMAND ape_solver_velocity)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_solver_velocity PRIVATE /W4)
+        else()
+            target_compile_options(ape_solver_velocity PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
 endif()
 
 add_subdirectory(examples)
@@ -267,6 +279,7 @@ if(APE_BUILD_WASM)
             -s EXPORT_NAME=Module
             -s ENVIRONMENT=web
             -s EXPORTED_FUNCTIONS='[_ape_world_create,_ape_world_destroy,_ape_world_step,_ape_world_create_rigidbody_p,_ape_world_get_position_out,_ape_world_set_gravity_p,_ape_version_major,_ape_version_minor,_ape_version_patch]'
+            -s EXPORTED_FUNCTIONS='[_ape_world_create,_ape_world_destroy,_ape_world_step,_ape_world_create_rigidbody_p,_ape_world_get_position_out,_ape_world_get_velocity_out,_ape_world_set_gravity_p,_ape_version_major,_ape_version_minor,_ape_version_patch]'
             -s EXPORTED_RUNTIME_METHODS='[cwrap,ccall,HEAPF32,_malloc,_free]')
     else()
         message(WARNING "APE_BUILD_WASM is ON but compiler is not Emscripten. Configure with emsdk toolchain to build WASM.")

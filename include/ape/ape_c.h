@@ -32,6 +32,7 @@ uint32_t ape_world_create_rigidbody(ape_world* w, ape_rigidbody_desc desc);
 void ape_world_destroy_rigidbody(ape_world* w, uint32_t id);
 void ape_world_step(ape_world* w, float dt);
 ape_vec3 ape_world_get_position(const ape_world* w, uint32_t id);
+ape_vec3 ape_world_get_velocity(const ape_world* w, uint32_t id);
 
 void ape_world_set_gravity(ape_world* w, ape_vec3 g);
 ape_vec3 ape_world_get_gravity(const ape_world* w);
@@ -40,6 +41,7 @@ ape_vec3 ape_world_get_gravity(const ape_world* w);
 uint32_t ape_world_create_rigidbody_p(ape_world* w, const ape_rigidbody_desc* desc);
 void ape_world_destroy_rigidbody_p(ape_world* w, const uint32_t* id);
 void ape_world_get_position_out(const ape_world* w, uint32_t id, ape_vec3* out);
+void ape_world_get_velocity_out(const ape_world* w, uint32_t id, ape_vec3* out);
 void ape_world_set_gravity_p(ape_world* w, const ape_vec3* g);
 void ape_world_get_gravity_out(const ape_world* w, ape_vec3* out);
 

@@ -10,7 +10,7 @@ Phase 0: Incubation (this repo)
 - [x] Broadphase (AABB, SAP baseline)
 - [x] Narrowphase (sphere-sphere baseline)
 - [x] Minimal positional solver (projection) for penetration resolution
-- [ ] Iterative solver (PGS) with warm-start
+- [x] Iterative solver (PGS) with warm-start (frictionless, baseline)
 - [ ] Deterministic step guarantees + tests
 - [ ] Profiling + logging infra
 - [ ] Fuzz tests, sanitizer CI

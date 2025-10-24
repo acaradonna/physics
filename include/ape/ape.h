@@ -28,6 +28,7 @@ public:
     void destroyRigidBody(std::uint32_t id);
     void step(float dt);
     Vec3 getPosition(std::uint32_t id) const;
+    Vec3 getVelocity(std::uint32_t id) const;
 
     // Global gravity (default 0,-9.80665,0)
     void setGravity(const Vec3& g);
