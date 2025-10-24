@@ -7,7 +7,7 @@ class JsWorld {
     this.g = {x:0, y:-9.80665, z:0};
   }
   createRigidBody(desc){
-    const d = { position: {...(desc.position||{x:0,y:0,z:0})}, velocity: {...(desc.velocity||{x:0,y:0,z:0})}, mass: desc.mass ?? 1 };
+    const d = { position: {...(desc.position||{x:0,y:0,z:0})}, velocity: {...(desc.velocity||{x:0,y:0,z:0})}, mass: desc.mass ?? 1, radius: desc.radius ?? 0.5 };
     const id = this.bodies.length;
     this.bodies.push(d);
     return id;
@@ -36,7 +36,7 @@ async function tryLoadWasm() {
     const _world_get_pos_out = cwrap('ape_world_get_position_out', null, ['number','number','number']);
     const _world_set_g_p = cwrap('ape_world_set_gravity_p', null, ['number','number']);
     const sizeVec3 = 12; // 3 * float32
-    const sizeDesc = 28; // two vec3 + float
+    const sizeDesc = 32; // two vec3 + 2 floats (mass, radius)
     class WasmWorld {
       constructor(){ this.ptr = _world_create(); }
       createRigidBody(desc){
@@ -45,8 +45,9 @@ async function tryLoadWasm() {
         // position (0..2), velocity (3..5), mass (6 as float32 after padding); layout matches ape_rigidbody_desc
         f32[0]=desc.position?.x||0; f32[1]=desc.position?.y||0; f32[2]=desc.position?.z||0;
         f32[3]=desc.velocity?.x||0; f32[4]=desc.velocity?.y||0; f32[5]=desc.velocity?.z||0;
-        // Mass placed at byte offset 24 => index 6
+        // Mass at offset 24 => index 6; radius at offset 28 => index 7
         f32[6]=desc.mass??1;
+        f32[7]=desc.radius??0.5;
         const id = _world_create_rb_p(this.ptr, ptr);
         Module._free(ptr);
         return id>>>0;

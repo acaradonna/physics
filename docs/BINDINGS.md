@@ -19,3 +19,10 @@ Versioning & features
 
 - ABI version in `ape_c.h`; query at runtime.
 - Feature flags for optional subsystems.
+
+Current C ABI surface
+
+- World lifecycle: `ape_world_create`, `ape_world_destroy`
+- Bodies: `ape_world_create_rigidbody`, `ape_world_destroy_rigidbody`, pointer variant `_p`
+- Queries: `ape_world_get_position`, pointer out variant, `ape_world_is_alive`, `ape_world_body_count`
+- Globals: `ape_world_set_gravity`, `ape_world_get_gravity` and pointer variants

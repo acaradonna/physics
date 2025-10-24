@@ -55,6 +55,19 @@
             </div>
             <canvas id="gp-canvas" width="640" height="360"></canvas>
           </article>
+
+          <article class="demo-card">
+            <header>
+              <h3>Sphere Collision</h3>
+              <p>Two spheres resolve penetration via narrowphase + projection.</p>
+            </header>
+            <div class="controls">
+              <span>Center distance: <strong id="collide-sep">—</strong></span>
+              <button id="collide-reset">Reset</button>
+              <button id="collide-toggle">Pause</button>
+            </div>
+            <canvas id="collide-canvas" width="640" height="360"></canvas>
+          </article>
         </div>
       </section>
 
@@ -86,5 +99,6 @@
     <script type="module" src="./js/engine.js"></script>
     <script type="module" src="./js/demos/falling.js"></script>
     <script type="module" src="./js/demos/gravity_playground.js"></script>
+    <script type="module" src="./js/demos/collision_spheres.js"></script>
   </body>
   </html>

@@ -29,7 +29,13 @@ uint32_t ape_world_create_rigidbody(ape_world* h, ape_rigidbody_desc desc) {
     d.position = {desc.position.x, desc.position.y, desc.position.z};
     d.velocity = {desc.velocity.x, desc.velocity.y, desc.velocity.z};
     d.mass = desc.mass;
+    d.radius = desc.radius > 0.0f ? desc.radius : 0.5f;
     return h->w->createRigidBody(d);
+}
+
+void ape_world_destroy_rigidbody(ape_world* h, uint32_t id) {
+    if (!h || !h->w) return;
+    h->w->destroyRigidBody(id);
 }
 
 uint32_t ape_world_create_rigidbody_p(ape_world* h, const ape_rigidbody_desc* desc) {
@@ -38,6 +44,7 @@ uint32_t ape_world_create_rigidbody_p(ape_world* h, const ape_rigidbody_desc* de
     d.position = {desc->position.x, desc->position.y, desc->position.z};
     d.velocity = {desc->velocity.x, desc->velocity.y, desc->velocity.z};
     d.mass = desc->mass;
+    d.radius = desc->radius > 0.0f ? desc->radius : 0.5f;
     return h->w->createRigidBody(d);
 }
 
@@ -75,6 +82,21 @@ void ape_world_get_gravity_out(const ape_world* h, ape_vec3* out) {
     if (!h || !h->w) { out->x = out->y = out->z = 0.0f; return; }
     auto g = h->w->getGravity();
     out->x = g.x; out->y = g.y; out->z = g.z;
+}
+
+void ape_world_destroy_rigidbody_p(ape_world* h, const uint32_t* id) {
+    if (!h || !h->w || !id) return;
+    h->w->destroyRigidBody(*id);
+}
+
+uint32_t ape_world_is_alive(const ape_world* h, uint32_t id) {
+    if (!h || !h->w) return 0u;
+    return h->w->isAlive(id) ? 1u : 0u;
+}
+
+size_t ape_world_body_count(const ape_world* h) {
+    if (!h || !h->w) return 0;
+    return h->w->bodyCount();
 }
 
 } // extern "C"

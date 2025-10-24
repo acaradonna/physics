@@ -9,6 +9,7 @@ int main(){
     d.position = (ape_vec3){0,5,0};
     d.velocity = (ape_vec3){0,0,0};
     d.mass = 1.0f;
+    d.radius = 0.5f;
     unsigned id = ape_world_create_rigidbody(w, d);
     for (int i=0;i<60;i++) ape_world_step(w, 1.0f/60.0f);
     ape_vec3 p = ape_world_get_position(w, id);

@@ -25,4 +25,8 @@ struct Pair { std::uint32_t a, b; };
 // Naive all-pairs broadphase; returns pairs with a < b
 void broadphase_naive(const AABB* boxes, std::size_t count, std::vector<Pair>& out);
 
+// Sweep-and-prune (1D) broadphase along the specified axis (0=x,1=y,2=z).
+// Returns candidate pairs with a < b, filtered by full 3D AABB overlap.
+void broadphase_sweep_1d(const AABB* boxes, std::size_t count, std::vector<Pair>& out, int axis = 0);
+
 } // namespace ape

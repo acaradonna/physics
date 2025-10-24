@@ -4,15 +4,15 @@
 int main(){
     ape::World w;
     // Two bodies close enough to overlap given r=0.5
-    ape::RigidBodyDesc a{}; a.position = {0,0,0};
-    ape::RigidBodyDesc b{}; b.position = {0.6f,0,0};
+    ape::RigidBodyDesc a{}; a.position = {0,0,0}; a.radius = 0.5f;
+    ape::RigidBodyDesc b{}; b.position = {0.6f,0,0}; b.radius = 0.5f;
     w.createRigidBody(a);
     w.createRigidBody(b);
     w.step(0.0f); // compute AABBs and pairs
     assert(w.debug_broadphasePairCount() == 1);
 
     // Move them apart by velocity and step
-    ape::RigidBodyDesc c{}; c.position = {10,0,0};
+    ape::RigidBodyDesc c{}; c.position = {10,0,0}; c.radius = 0.5f;
     w.createRigidBody(c);
     w.step(0.0f);
     // Still only first pair overlaps

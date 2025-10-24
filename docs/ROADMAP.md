@@ -6,8 +6,10 @@ Phase 0: Incubation (this repo)
 - [x] CMake build + smoke test
 - [x] Job system foundation (threads, queues)
 - [x] SoA body storage + handles
-- [ ] Broadphase (AABB, SAP)
-- [ ] Narrowphase (GJK/EPA baseline)
+- [x] Body lifecycle: destroy, generation bump, isAlive, bodyCount
+- [x] Broadphase (AABB, SAP baseline)
+- [x] Narrowphase (sphere-sphere baseline)
+- [x] Minimal positional solver (projection) for penetration resolution
 - [ ] Iterative solver (PGS) with warm-start
 - [ ] Deterministic step guarantees + tests
 - [ ] Profiling + logging infra

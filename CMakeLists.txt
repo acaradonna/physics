@@ -15,7 +15,10 @@ add_library(ape_core
     src/ape.cpp
     src/foundation/job.cpp
     src/collision/broadphase.cpp
+    src/collision/narrowphase.cpp
 )
+
+set_target_properties(ape_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(ape_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -137,6 +140,52 @@ if(APE_BUILD_TESTS)
             target_compile_options(ape_world_bp PRIVATE /W4)
         else()
             target_compile_options(ape_world_bp PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
+    add_executable(ape_destroy test/destroy.cpp)
+    target_link_libraries(ape_destroy PRIVATE ape_core)
+    add_test(NAME destroy COMMAND ape_destroy)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_destroy PRIVATE /W4)
+        else()
+            target_compile_options(ape_destroy PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
+
+    add_executable(ape_c_destroy test/c_api_destroy.c)
+    target_link_libraries(ape_c_destroy PRIVATE ape_c)
+    add_test(NAME c_destroy COMMAND ape_c_destroy)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_c_destroy PRIVATE /W4)
+        else()
+            target_compile_options(ape_c_destroy PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
+    add_executable(ape_broadphase_sweep test/broadphase_sweep.cpp)
+    target_link_libraries(ape_broadphase_sweep PRIVATE ape_core)
+    add_test(NAME broadphase_sweep COMMAND ape_broadphase_sweep)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_broadphase_sweep PRIVATE /W4)
+        else()
+            target_compile_options(ape_broadphase_sweep PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
+
+    add_executable(ape_collision_spheres test/collision_spheres.cpp)
+    target_link_libraries(ape_collision_spheres PRIVATE ape_core)
+    add_test(NAME collision_spheres COMMAND ape_collision_spheres)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_collision_spheres PRIVATE /W4)
+        else()
+            target_compile_options(ape_collision_spheres PRIVATE -Wall -Wextra -Wpedantic)
         endif()
     endif()
 endif()
