@@ -10,6 +10,8 @@ static inline float rsqrt_safe(float x) {
 
 void generate_contacts_sphere_sphere(const Vec3* positions,
                                      const float* radii,
+                                     const float* frictions,
+                                     const float* restitutions,
                                      std::size_t /*count*/,
                                      const std::vector<Pair>& pairs,
                                      std::vector<Contact>& out)
@@ -38,7 +40,14 @@ void generate_contacts_sphere_sphere(const Vec3* positions,
                 nx = 0.0f; ny = 1.0f; nz = 0.0f;
                 penetration = rsum;
             }
-            out.push_back(Contact{p.a, p.b, nx, ny, nz, penetration});
+            // Combine material properties: geometric mean for friction, min for restitution
+            const float fa = frictions ? frictions[p.a] : 0.5f;
+            const float fb = frictions ? frictions[p.b] : 0.5f;
+            const float combined_friction = std::sqrt(fa * fb);
+            const float ra_rest = restitutions ? restitutions[p.a] : 0.0f;
+            const float rb_rest = restitutions ? restitutions[p.b] : 0.0f;
+            const float combined_restitution = (ra_rest < rb_rest) ? ra_rest : rb_rest;
+            out.push_back(Contact{p.a, p.b, nx, ny, nz, penetration, combined_friction, combined_restitution});
         }
     }
 }

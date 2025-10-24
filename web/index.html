@@ -68,6 +68,20 @@
             </div>
             <canvas id="collide-canvas" width="640" height="360"></canvas>
           </article>
+
+          <article class="demo-card">
+            <header>
+              <h3>Stacking</h3>
+              <p>Stack of spheres with adjustable friction and restitution.</p>
+            </header>
+            <div class="controls">
+              <label>Friction <input type="range" id="stack-friction" min="0" max="1" step="0.1" value="0.5"/></label>
+              <label>Restitution <input type="range" id="stack-restitution" min="0" max="1" step="0.1" value="0.0"/></label>
+              <button id="stack-reset">Reset</button>
+              <button id="stack-toggle">Pause</button>
+            </div>
+            <canvas id="stack-canvas" width="640" height="360"></canvas>
+          </article>
         </div>
       </section>
 
@@ -100,5 +114,6 @@
     <script type="module" src="./js/demos/falling.js"></script>
     <script type="module" src="./js/demos/gravity_playground.js"></script>
     <script type="module" src="./js/demos/collision_spheres.js"></script>
+    <script type="module" src="./js/demos/stacking.js"></script>
   </body>
-  </html>
+</html>

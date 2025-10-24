@@ -200,6 +200,18 @@ if(APE_BUILD_TESTS)
             target_compile_options(ape_solver_velocity PRIVATE -Wall -Wextra -Wpedantic)
         endif()
     endif()
+
+    add_executable(ape_restitution test/restitution.cpp)
+    target_link_libraries(ape_restitution PRIVATE ape_core)
+    add_test(NAME restitution COMMAND ape_restitution)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_restitution PRIVATE /W4)
+        else()
+            target_compile_options(ape_restitution PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
 endif()
 
 add_subdirectory(examples)

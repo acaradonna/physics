@@ -18,6 +18,8 @@ struct World::Impl {
     std::vector<Vec3> vel;
     std::vector<float> mass;
     std::vector<float> radius;
+    std::vector<float> friction;
+    std::vector<float> restitution;
     std::vector<uint16_t> gen; // per-slot generation counters
     std::vector<uint16_t> alive; // 1 if occupied, 0 if free (small, cache-friendly)
     std::vector<uint16_t> free_list; // indices available for reuse
@@ -31,8 +33,10 @@ struct World::Impl {
     std::vector<Contact> contacts;
     // Solver warm-start state
     std::vector<Pair> warm_pairs;
-    std::vector<float> warm_impulses;   // per-pair accumulated normal impulse
-    std::vector<float> solver_impulses; // current-frame accumulated normal impulse
+    std::vector<float> warm_impulses_n;  // per-pair accumulated normal impulse
+    std::vector<Vec3> warm_impulses_t;   // per-pair accumulated tangent impulse (friction)
+    std::vector<float> solver_impulses_n; // current-frame normal impulse
+    std::vector<Vec3> solver_impulses_t;  // current-frame tangent impulse
 
     static uint32_t pack_handle(uint16_t index, uint16_t generation) {
         return (static_cast<uint32_t>(generation) << INDEX_BITS) | static_cast<uint32_t>(index);
@@ -57,6 +61,8 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
             impl->vel.push_back(d.velocity);
             impl->mass.push_back(d.mass);
             impl->radius.push_back(d.radius > 0.0f ? d.radius : 0.5f);
+            impl->friction.push_back(d.friction);
+            impl->restitution.push_back(d.restitution);
             impl->gen.push_back(0);
             impl->alive.push_back(1);
             return Impl::pack_handle(idx, impl->gen[idx]);
@@ -64,9 +70,13 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
         impl->pos[idx] = d.position;
         impl->vel[idx] = d.velocity;
         impl->mass[idx] = d.mass;
-        // ensure radius vector is large enough
+        // ensure vectors are large enough
         if (idx >= impl->radius.size()) impl->radius.resize(idx+1, 0.5f);
         impl->radius[idx] = d.radius > 0.0f ? d.radius : 0.5f;
+        if (idx >= impl->friction.size()) impl->friction.resize(idx+1, 0.5f);
+        impl->friction[idx] = d.friction;
+        if (idx >= impl->restitution.size()) impl->restitution.resize(idx+1, 0.0f);
+        impl->restitution[idx] = d.restitution;
         impl->alive[idx] = 1;
     } else {
         if (impl->pos.size() >= std::numeric_limits<uint16_t>::max()) {
@@ -78,6 +88,8 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
         impl->vel.push_back(d.velocity);
         impl->mass.push_back(d.mass);
         impl->radius.push_back(d.radius > 0.0f ? d.radius : 0.5f);
+        impl->friction.push_back(d.friction);
+        impl->restitution.push_back(d.restitution);
         impl->gen.push_back(0);
         impl->alive.push_back(1);
     }
@@ -124,29 +136,38 @@ void World::step(float dt) {
     // 3) Narrowphase contacts
     impl->contacts.clear();
     const float* radii_ptr = impl->radius.empty() ? nullptr : impl->radius.data();
-    generate_contacts_sphere_sphere(impl->pos.data(), radii_ptr, impl->pos.size(), impl->pairs, impl->contacts);
+    const float* friction_ptr = impl->friction.empty() ? nullptr : impl->friction.data();
+    const float* restitution_ptr = impl->restitution.empty() ? nullptr : impl->restitution.data();
+    generate_contacts_sphere_sphere(impl->pos.data(), radii_ptr, friction_ptr, restitution_ptr, impl->pos.size(), impl->pairs, impl->contacts);
 
-    // 4) Frictionless PGS solver with warm-start
+    // 4) PGS solver with friction, restitution, warm-start
     const int solverIterations = 8;
     const float baumgarte = 0.2f; // positional error correction factor
 
     // Initialize current impulses and warm-start
-    impl->solver_impulses.assign(impl->contacts.size(), 0.0f);
-    if (!impl->warm_pairs.empty() && !impl->warm_impulses.empty()) {
+    impl->solver_impulses_n.assign(impl->contacts.size(), 0.0f);
+    impl->solver_impulses_t.assign(impl->contacts.size(), Vec3{0,0,0});
+    if (!impl->warm_pairs.empty() && !impl->warm_impulses_n.empty()) {
         for (size_t i = 0; i < impl->contacts.size(); ++i) {
             const Pair key{impl->contacts[i].a, impl->contacts[i].b};
             for (size_t j = 0; j < impl->warm_pairs.size(); ++j) {
                 if (impl->warm_pairs[j].a == key.a && impl->warm_pairs[j].b == key.b) {
-                    const float J = impl->warm_impulses[j];
-                    impl->solver_impulses[i] = J;
-                    // Apply warm-start impulse to velocities
+                    const float Jn = impl->warm_impulses_n[j];
+                    const Vec3 Jt = impl->warm_impulses_t[j];
+                    impl->solver_impulses_n[i] = Jn;
+                    impl->solver_impulses_t[i] = Jt;
+                    // Apply warm-start impulses to velocities
                     const float invMa = (impl->mass[key.a] > 0.0f) ? (1.0f / impl->mass[key.a]) : 0.0f;
                     const float invMb = (impl->mass[key.b] > 0.0f) ? (1.0f / impl->mass[key.b]) : 0.0f;
                     Vec3 va = impl->vel[key.a];
                     Vec3 vb = impl->vel[key.b];
                     const Contact &c = impl->contacts[i];
-                    va.x -= c.nx * (J * invMa); va.y -= c.ny * (J * invMa); va.z -= c.nz * (J * invMa);
-                    vb.x += c.nx * (J * invMb); vb.y += c.ny * (J * invMb); vb.z += c.nz * (J * invMb);
+                    // Normal impulse
+                    va.x -= c.nx * (Jn * invMa); va.y -= c.ny * (Jn * invMa); va.z -= c.nz * (Jn * invMa);
+                    vb.x += c.nx * (Jn * invMb); vb.y += c.ny * (Jn * invMb); vb.z += c.nz * (Jn * invMb);
+                    // Tangent impulse
+                    va.x -= Jt.x * invMa; va.y -= Jt.y * invMa; va.z -= Jt.z * invMa;
+                    vb.x += Jt.x * invMb; vb.y += Jt.y * invMb; vb.z += Jt.z * invMb;
                     impl->vel[key.a] = va; impl->vel[key.b] = vb;
                     break;
                 }
@@ -169,19 +190,61 @@ void World::step(float dt) {
                 const float rvy = vb.y - va.y;
                 const float rvz = vb.z - va.z;
                 const float vn = rvx * c.nx + rvy * c.ny + rvz * c.nz;
-                const float bias = baumgarte * (c.penetration / dt);
                 const float k = invMa + invMb;
                 if (k <= 0.0f) continue;
-                float deltaJ = -(vn + bias) / k;
-                float J = impl->solver_impulses[i];
-                float Jnew = J + deltaJ;
-                if (Jnew < 0.0f) Jnew = 0.0f;
-                deltaJ = Jnew - J;
-                if (deltaJ != 0.0f) {
-                    va.x -= c.nx * (deltaJ * invMa); va.y -= c.ny * (deltaJ * invMa); va.z -= c.nz * (deltaJ * invMa);
-                    vb.x += c.nx * (deltaJ * invMb); vb.y += c.ny * (deltaJ * invMb); vb.z += c.nz * (deltaJ * invMb);
+
+                // Normal impulse with restitution and Baumgarte bias
+                float bias = baumgarte * (c.penetration / dt);
+                // Apply restitution only on first iteration and if separating velocity is significant
+                if (iter == 0 && c.restitution > 0.0f && vn < -0.1f) {
+                    bias -= c.restitution * vn;
+                }
+                float deltaJn = -(vn + bias) / k;
+                float Jn = impl->solver_impulses_n[i];
+                float Jn_new = Jn + deltaJn;
+                if (Jn_new < 0.0f) Jn_new = 0.0f;
+                deltaJn = Jn_new - Jn;
+                if (deltaJn != 0.0f) {
+                    va.x -= c.nx * (deltaJn * invMa); va.y -= c.ny * (deltaJn * invMa); va.z -= c.nz * (deltaJn * invMa);
+                    vb.x += c.nx * (deltaJn * invMb); vb.y += c.ny * (deltaJn * invMb); vb.z += c.nz * (deltaJn * invMb);
                     impl->vel[ia] = va; impl->vel[ib] = vb;
-                    impl->solver_impulses[i] = Jnew;
+                    impl->solver_impulses_n[i] = Jn_new;
+                    Jn = Jn_new;
+                }
+
+                // Friction impulse (tangential)
+                if (c.friction > 0.0f) {
+                    va = impl->vel[ia];
+                    vb = impl->vel[ib];
+                    const float rvx_t = (vb.x - va.x) - vn * c.nx;
+                    const float rvy_t = (vb.y - va.y) - vn * c.ny;
+                    const float rvz_t = (vb.z - va.z) - vn * c.nz;
+                    const float vt_mag = std::sqrt(rvx_t*rvx_t + rvy_t*rvy_t + rvz_t*rvz_t);
+                    if (vt_mag > 1e-6f) {
+                        const float tx = rvx_t / vt_mag;
+                        const float ty = rvy_t / vt_mag;
+                        const float tz = rvz_t / vt_mag;
+                        const float vt = vt_mag;
+                        float deltaJt_mag = -vt / k;
+                        Vec3 Jt = impl->solver_impulses_t[i];
+                        const float Jt_old_mag = std::sqrt(Jt.x*Jt.x + Jt.y*Jt.y + Jt.z*Jt.z);
+                        const float Jt_new_mag = Jt_old_mag + deltaJt_mag;
+                        const float maxFriction = c.friction * Jn;
+                        float Jt_clamped = Jt_new_mag;
+                        if (Jt_clamped > maxFriction) Jt_clamped = maxFriction;
+                        if (Jt_clamped < -maxFriction) Jt_clamped = -maxFriction;
+                        deltaJt_mag = Jt_clamped - Jt_old_mag;
+                        if (std::abs(deltaJt_mag) > 1e-9f) {
+                            const float deltaJtx = tx * deltaJt_mag;
+                            const float deltaJty = ty * deltaJt_mag;
+                            const float deltaJtz = tz * deltaJt_mag;
+                            va.x -= deltaJtx * invMa; va.y -= deltaJty * invMa; va.z -= deltaJtz * invMa;
+                            vb.x += deltaJtx * invMb; vb.y += deltaJty * invMb; vb.z += deltaJtz * invMb;
+                            impl->vel[ia] = va; impl->vel[ib] = vb;
+                            Jt.x += deltaJtx; Jt.y += deltaJty; Jt.z += deltaJtz;
+                            impl->solver_impulses_t[i] = Jt;
+                        }
+                    }
                 }
             }
         }
@@ -222,12 +285,15 @@ void World::step(float dt) {
 
     // Save warm-start for next frame
     impl->warm_pairs.clear();
-    impl->warm_impulses.clear();
+    impl->warm_impulses_n.clear();
+    impl->warm_impulses_t.clear();
     impl->warm_pairs.reserve(impl->contacts.size());
-    impl->warm_impulses.reserve(impl->contacts.size());
+    impl->warm_impulses_n.reserve(impl->contacts.size());
+    impl->warm_impulses_t.reserve(impl->contacts.size());
     for (size_t i = 0; i < impl->contacts.size(); ++i) {
         impl->warm_pairs.push_back(Pair{impl->contacts[i].a, impl->contacts[i].b});
-        impl->warm_impulses.push_back(impl->solver_impulses[i]);
+        impl->warm_impulses_n.push_back(impl->solver_impulses_n[i]);
+        impl->warm_impulses_t.push_back(impl->solver_impulses_t[i]);
     }
 
     // 5) Integrate positions with solved velocities

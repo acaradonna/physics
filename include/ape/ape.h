@@ -17,6 +17,9 @@ struct RigidBodyDesc {
     float mass{1.0f};
     // Sphere radius for broadphase/narrowphase (temporary shape model)
     float radius{0.5f};
+    // Material properties
+    float friction{0.5f};    // Coulomb friction coefficient (0=frictionless, 1=high friction)
+    float restitution{0.0f}; // Coefficient of restitution (0=inelastic, 1=perfectly elastic)
 };
 
 class World {
