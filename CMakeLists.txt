@@ -224,6 +224,18 @@ if(APE_BUILD_TESTS)
             target_compile_options(ape_sleeping PRIVATE -Wall -Wextra -Wpedantic)
         endif()
     endif()
+
+    add_executable(ape_box_shapes test/box_shapes.cpp)
+    target_link_libraries(ape_box_shapes PRIVATE ape_core)
+    add_test(NAME box_shapes COMMAND ape_box_shapes)
+
+    if(APE_ENABLE_WARNINGS)
+        if(MSVC)
+            target_compile_options(ape_box_shapes PRIVATE /W4)
+        else()
+            target_compile_options(ape_box_shapes PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+    endif()
 endif()
 
 add_subdirectory(examples)

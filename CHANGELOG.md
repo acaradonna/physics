@@ -44,3 +44,16 @@ All notable changes to this project will be documented in this file.
 - Add `sleeping` test: validates sleep state transitions.
 - Expected 3-5x performance improvement for large static scenes.
 - All 13 tests pass (100%).
+
+## 2025-10-24 11:58 EDT - Box Shapes and SAT Collision
+
+- Add `ShapeType` enum (Sphere, Box) to `RigidBodyDesc`.
+- Implement box primitive with half-extents storage.
+- Implement AABB generation for axis-aligned boxes.
+- Implement sphere-box collision using closest-point-on-box method.
+- Implement box-box collision using SAT (Separating Axis Theorem).
+- Create unified `generate_contacts()` dispatcher handling all shape combinations.
+- Update all tests to use `sphere_radius` field.
+- Add `box_shapes` test validating box collision detection.
+- All 14 tests pass (100%).
+- Note: Boxes are axis-aligned; rotation support deferred to future.

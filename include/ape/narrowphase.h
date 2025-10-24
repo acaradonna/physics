@@ -34,6 +34,23 @@ void generate_contacts_sphere_sphere(const Vec3* positions,
                                      const std::vector<Pair>& pairs,
                                      std::vector<Contact>& out);
 
+// Unified narrowphase dispatcher handling all shape combinations
+// Inputs:
+// - positions, shape_types, sphere_radii, box_half_extents: per-body arrays
+// - frictions, restitutions: material properties
+// - pairs: candidate pairs from broadphase
+// Output:
+// - out: appended with detected contacts
+void generate_contacts(const Vec3* positions,
+                       const uint8_t* shape_types,
+                       const float* sphere_radii,
+                       const Vec3* box_half_extents,
+                       const float* frictions,
+                       const float* restitutions,
+                       std::size_t count,
+                       const std::vector<Pair>& pairs,
+                       std::vector<Contact>& out);
+
 } // namespace ape
 
 

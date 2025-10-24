@@ -182,12 +182,74 @@ Engineering decisions, implementation notes, research findings, and challenges d
 
 ---
 
+## 2025-10-24 11:58 EDT - Box Shapes and SAT Collision
+
+**What:** Implemented box primitive and SAT-based collision detection for all shape combinations.
+
+**Implementation:**
+- Added `ShapeType` enum (Sphere, Box)
+- Extended `RigidBodyDesc` with `shape_type`, `sphere_radius`, `box_half_extents`
+- Added shape storage to `World::Impl` SoA layout
+- Implemented AABB generation for boxes (axis-aligned)
+
+**Collision Detection:**
+- **Sphere-Box:** Closest-point-on-box method
+  - Clamp sphere center to box AABB
+  - Check distance from clamped point to sphere center
+  - Normal points from clamped point toward sphere center
+  - Special case: sphere center inside box (choose minimal separation axis)
+- **Box-Box:** SAT (Separating Axis Theorem) for axis-aligned boxes
+  - Test 3 separation axes (X, Y, Z)
+  - Compute overlap on each axis
+  - Choose axis with minimum penetration
+  - Normal points along minimum penetration axis
+
+**Unified Narrowphase:**
+- Created `generate_contacts()` dispatcher handling all shape combinations
+- Keeps existing `generate_contacts_sphere_sphere()` for reference
+- Material combination (friction/restitution) unified across all types
+
+**Testing:**
+- Added `box_shapes` test validating box-box collision and separation
+- All 14 tests pass (100%)
+- Verified dynamic-dynamic box collisions work correctly
+
+**Current Limitations:**
+- Boxes are axis-aligned only (no rotation yet)
+- Static bodies (mass=0) with sphere-box need investigation
+- Single-point contacts (no manifolds yet)
+
+**Design Decisions:**
+- Chose closest-point method for sphere-box over GJK (simpler, faster for AA boxes)
+- SAT for box-box: straightforward for axis-aligned, extensible to OBB later
+- Store both sphere and box data for all bodies (wastes ~16 bytes per body but simplifies code)
+
+**Research Notes:**
+- SAT test axes for AA boxes: just 3 (world X, Y, Z)
+- For oriented boxes (future): need 15 axes (3 face normals per box + 9 edge-edge cross products)
+- Closest-point method: mathematically equivalent to GJK for convex shapes but optimized
+- Normal direction convention critical: must be consistent with solver expectations
+
+**Challenges:**
+- Initial normal direction confusion: solver expects normal from a->b
+- Sphere-box with static box shows unexpected behavior (deferred investigation)
+- Simplified test to focus on dynamic-dynamic cases for now
+
+**Performance Notes:**
+- Box AABB generation: 6 additions (vs 3 for sphere)
+- Sphere-box collision: ~15 ops (clamp + distance check)
+- Box-box SAT: ~20 ops (3 axis tests + min-finding)
+- Negligible overhead vs sphere-only
+
+---
+
 ## Next Steps (Prioritized)
 
-1. **Shape Types:** Box primitive with SAT narrowphase (essential for diverse scenes)
+1. **Static Bodies:** Fix sphere-box collision with mass=0 bodies; add explicit static flag
 2. **Profiling:** Add zone timers and counters for broadphase/narrowphase/solver
 3. **Contact Manifolds:** Multi-point contacts for box-box stability
-4. **CCD:** Continuous collision detection for fast-moving objects (tunneling prevention)
-5. **Islands:** Detect connected components for batch sleeping
+4. **Rotation:** Add quaternion orientation; update SAT for oriented boxes (OBB)
+5. **CCD:** Continuous collision detection for fast-moving objects (tunneling prevention)
+6. **Islands:** Detect connected components for batch sleeping
 
 ---

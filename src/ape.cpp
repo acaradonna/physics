@@ -17,7 +17,9 @@ struct World::Impl {
     std::vector<Vec3> pos;
     std::vector<Vec3> vel;
     std::vector<float> mass;
-    std::vector<float> radius;
+    std::vector<uint8_t> shape_type; // ShapeType enum
+    std::vector<float> sphere_radius;
+    std::vector<Vec3> box_half_extents;
     std::vector<float> friction;
     std::vector<float> restitution;
     std::vector<uint16_t> gen; // per-slot generation counters
@@ -67,7 +69,9 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
             impl->pos.push_back(d.position);
             impl->vel.push_back(d.velocity);
             impl->mass.push_back(d.mass);
-            impl->radius.push_back(d.radius > 0.0f ? d.radius : 0.5f);
+            impl->shape_type.push_back(static_cast<uint8_t>(d.shape_type));
+            impl->sphere_radius.push_back(d.sphere_radius > 0.0f ? d.sphere_radius : 0.5f);
+            impl->box_half_extents.push_back(d.box_half_extents);
             impl->friction.push_back(d.friction);
             impl->restitution.push_back(d.restitution);
             impl->gen.push_back(0);
@@ -80,8 +84,12 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
         impl->vel[idx] = d.velocity;
         impl->mass[idx] = d.mass;
         // ensure vectors are large enough
-        if (idx >= impl->radius.size()) impl->radius.resize(idx+1, 0.5f);
-        impl->radius[idx] = d.radius > 0.0f ? d.radius : 0.5f;
+        if (idx >= impl->shape_type.size()) impl->shape_type.resize(idx+1, static_cast<uint8_t>(ShapeType::Sphere));
+        impl->shape_type[idx] = static_cast<uint8_t>(d.shape_type);
+        if (idx >= impl->sphere_radius.size()) impl->sphere_radius.resize(idx+1, 0.5f);
+        impl->sphere_radius[idx] = d.sphere_radius > 0.0f ? d.sphere_radius : 0.5f;
+        if (idx >= impl->box_half_extents.size()) impl->box_half_extents.resize(idx+1, Vec3{0.5f,0.5f,0.5f});
+        impl->box_half_extents[idx] = d.box_half_extents;
         if (idx >= impl->friction.size()) impl->friction.resize(idx+1, 0.5f);
         impl->friction[idx] = d.friction;
         if (idx >= impl->restitution.size()) impl->restitution.resize(idx+1, 0.0f);
@@ -100,7 +108,9 @@ std::uint32_t World::createRigidBody(const RigidBodyDesc& d) {
         impl->pos.push_back(d.position);
         impl->vel.push_back(d.velocity);
         impl->mass.push_back(d.mass);
-        impl->radius.push_back(d.radius > 0.0f ? d.radius : 0.5f);
+        impl->shape_type.push_back(static_cast<uint8_t>(d.shape_type));
+        impl->sphere_radius.push_back(d.sphere_radius > 0.0f ? d.sphere_radius : 0.5f);
+        impl->box_half_extents.push_back(d.box_half_extents);
         impl->friction.push_back(d.friction);
         impl->restitution.push_back(d.restitution);
         impl->gen.push_back(0);
@@ -141,8 +151,16 @@ void World::step(float dt) {
         if (!impl->alive[i]) { impl->aabbs.push_back(AABB{0,0,0,0,0,0}); continue; }
         // Include sleeping bodies in broadphase to wake them on contact
         const Vec3 p = impl->pos[i];
-        const float r = (i < impl->radius.size() && impl->radius[i] > 0.0f) ? impl->radius[i] : 0.5f;
-        AABB box{p.x - r, p.y - r, p.z - r, p.x + r, p.y + r, p.z + r};
+        const ShapeType stype = (i < impl->shape_type.size()) ? static_cast<ShapeType>(impl->shape_type[i]) : ShapeType::Sphere;
+        AABB box{};
+        if (stype == ShapeType::Box) {
+            const Vec3 h = (i < impl->box_half_extents.size()) ? impl->box_half_extents[i] : Vec3{0.5f,0.5f,0.5f};
+            box = AABB{p.x - h.x, p.y - h.y, p.z - h.z, p.x + h.x, p.y + h.y, p.z + h.z};
+        } else {
+            // Sphere
+            const float r = (i < impl->sphere_radius.size() && impl->sphere_radius[i] > 0.0f) ? impl->sphere_radius[i] : 0.5f;
+            box = AABB{p.x - r, p.y - r, p.z - r, p.x + r, p.y + r, p.z + r};
+        }
         impl->aabbs.push_back(box);
     }
     impl->pairs.clear();
@@ -151,10 +169,13 @@ void World::step(float dt) {
 
     // 3) Narrowphase contacts
     impl->contacts.clear();
-    const float* radii_ptr = impl->radius.empty() ? nullptr : impl->radius.data();
+    const uint8_t* shape_types_ptr = impl->shape_type.empty() ? nullptr : impl->shape_type.data();
+    const float* sphere_radii_ptr = impl->sphere_radius.empty() ? nullptr : impl->sphere_radius.data();
+    const Vec3* box_half_extents_ptr = impl->box_half_extents.empty() ? nullptr : impl->box_half_extents.data();
     const float* friction_ptr = impl->friction.empty() ? nullptr : impl->friction.data();
     const float* restitution_ptr = impl->restitution.empty() ? nullptr : impl->restitution.data();
-    generate_contacts_sphere_sphere(impl->pos.data(), radii_ptr, friction_ptr, restitution_ptr, impl->pos.size(), impl->pairs, impl->contacts);
+    generate_contacts(impl->pos.data(), shape_types_ptr, sphere_radii_ptr, box_half_extents_ptr, 
+                     friction_ptr, restitution_ptr, impl->pos.size(), impl->pairs, impl->contacts);
 
     // Wake sleeping bodies on contact with awake bodies
     for (const Contact &c : impl->contacts) {

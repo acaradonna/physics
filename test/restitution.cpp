@@ -6,7 +6,7 @@ int main(){
     ape::World w;
     w.setGravity({0, -10.0f, 0});
     // Drop a bouncy ball from height 10
-    ape::RigidBodyDesc d{}; d.position={0,10,0}; d.velocity={0,0,0}; d.mass=1.0f; d.radius=0.5f;
+    ape::RigidBodyDesc d{}; d.position={0,10,0}; d.velocity={0,0,0}; d.mass=1.0f; d.sphere_radius=0.5f;
     d.friction = 0.0f;
     d.restitution = 0.8f; // High bounce
     auto id = w.createRigidBody(d);

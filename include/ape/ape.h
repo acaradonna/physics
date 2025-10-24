@@ -11,12 +11,21 @@ struct Vec3 {
     float x, y, z;
 };
 
+enum class ShapeType : std::uint8_t {
+    Sphere = 0,
+    Box = 1,
+};
+
 struct RigidBodyDesc {
     Vec3 position{0,0,0};
     Vec3 velocity{0,0,0};
     float mass{1.0f};
-    // Sphere radius for broadphase/narrowphase (temporary shape model)
-    float radius{0.5f};
+    
+    // Shape (shape_type determines which shape fields are used)
+    ShapeType shape_type{ShapeType::Sphere};
+    float sphere_radius{0.5f};        // used when shape_type == Sphere
+    Vec3 box_half_extents{0.5f,0.5f,0.5f}; // used when shape_type == Box (half-width, half-height, half-depth)
+    
     // Material properties
     float friction{0.5f};    // Coulomb friction coefficient (0=frictionless, 1=high friction)
     float restitution{0.0f}; // Coefficient of restitution (0=inelastic, 1=perfectly elastic)

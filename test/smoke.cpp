@@ -7,7 +7,7 @@ int main() {
     ape::RigidBodyDesc d{};
     d.position = {0, 10, 0};
     d.mass = 1.0f;
-    d.radius = 0.5f;
+    d.sphere_radius = 0.5f;
     auto id = world.createRigidBody(d);
 
     for (int i=0;i<60;i++) world.step(1.0f/60.0f);

@@ -29,7 +29,8 @@ uint32_t ape_world_create_rigidbody(ape_world* h, ape_rigidbody_desc desc) {
     d.position = {desc.position.x, desc.position.y, desc.position.z};
     d.velocity = {desc.velocity.x, desc.velocity.y, desc.velocity.z};
     d.mass = desc.mass;
-    d.radius = desc.radius > 0.0f ? desc.radius : 0.5f;
+    d.shape_type = ape::ShapeType::Sphere;
+    d.sphere_radius = desc.radius > 0.0f ? desc.radius : 0.5f;
     return h->w->createRigidBody(d);
 }
 
@@ -44,7 +45,8 @@ uint32_t ape_world_create_rigidbody_p(ape_world* h, const ape_rigidbody_desc* de
     d.position = {desc->position.x, desc->position.y, desc->position.z};
     d.velocity = {desc->velocity.x, desc->velocity.y, desc->velocity.z};
     d.mass = desc->mass;
-    d.radius = desc->radius > 0.0f ? desc->radius : 0.5f;
+    d.shape_type = ape::ShapeType::Sphere;
+    d.sphere_radius = desc->radius > 0.0f ? desc->radius : 0.5f;
     return h->w->createRigidBody(d);
 }
 
